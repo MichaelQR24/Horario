@@ -4,6 +4,23 @@ const START_HOUR = 7;
 const END_HOUR = 23;
 const SLOT_DURATION = 45;
 
+// Firebase Initialization
+let firebaseApp = null;
+let firebaseAuth = null;
+let firebaseDb = null;
+let currentUser = null;
+
+try {
+    if (typeof firebase !== 'undefined' && typeof firebaseConfig !== 'undefined') {
+        firebaseApp = firebase.initializeApp(firebaseConfig);
+        firebaseAuth = firebase.auth();
+        firebaseDb = firebase.firestore();
+        console.log('Firebase initialized successfully');
+    }
+} catch (e) {
+    console.log('Firebase not available:', e.message);
+}
+
 // Activity Types
 const ACTIVITIES = {
     WETALK: { name: '🗣️ WeTalk', class: 'wetalk', duration: 120 },
@@ -350,9 +367,12 @@ function generateSchedule() {
             const timeRange = `${formatTimeDisplay(slot.start)} - ${formatTimeDisplay(endTime)}`;
 
             const showCheckbox = slot.activity.class !== 'free' && slot.activity.class !== 'break';
+            const noteKey = `note-${dayIndex}-${slotIndex}`;
+            const hasNote = localStorage.getItem(noteKey);
 
             cell.innerHTML = `
                 ${showCheckbox ? `<input type="checkbox" class="task-checkbox" ${isCompleted ? 'checked' : ''} onclick="event.stopPropagation(); toggleComplete(${dayIndex}, ${slotIndex})">` : ''}
+                <button class="note-btn ${hasNote ? 'has-note' : ''}" onclick="event.stopPropagation(); openNoteModal(${dayIndex}, ${slotIndex})" aria-label="Agregar nota">📝</button>
                 <div class="activity-time">${timeRange}</div>
                 <div class="activity-name">${slot.activity.name}</div>
                 <div class="activity-duration">${slot.duration} min</div>
@@ -364,7 +384,7 @@ function generateSchedule() {
             if (showCheckbox) {
                 cell.style.cursor = 'pointer';
                 cell.onclick = (e) => {
-                    if (e.target.type !== 'checkbox') {
+                    if (e.target.type !== 'checkbox' && !e.target.classList.contains('note-btn')) {
                         toggleComplete(dayIndex, slotIndex);
                     }
                 };
@@ -402,6 +422,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Reminders
     initReminders();
+
+    // Initialize Phase 4 features
+    initSoundSettings();
+    initFocusMode();
+
+    // Initialize Phase 5 features
+    initGoals();
+    initNotes();
+    initCalendar();
+    initPdfExport();
+
+    // Initialize Phase 6 features
+    initFirebaseAuth();
 
     // Animation on scroll
     const observer = new IntersectionObserver((entries) => {
@@ -569,26 +602,1129 @@ function showNotification(title, body) {
     }
 }
 
-function playNotificationSound() {
-    // Create a simple beep using Web Audio API
+// ==================== PHASE 4: SOUND SYSTEM ====================
+
+const SOUND_STORAGE_KEY = 'sound_preferences';
+
+// Sound definitions using Web Audio API parameters
+const SOUND_TONES = {
+    gentle: {
+        name: 'Suave',
+        frequencies: [523.25, 659.25, 783.99],
+        type: 'sine',
+        duration: 0.3,
+        gap: 0.15
+    },
+    chime: {
+        name: 'Campana',
+        frequencies: [880, 1174.66, 1396.91],
+        type: 'triangle',
+        duration: 0.4,
+        gap: 0.1
+    },
+    alert: {
+        name: 'Alerta',
+        frequencies: [800, 600, 800],
+        type: 'square',
+        duration: 0.15,
+        gap: 0.05
+    },
+    success: {
+        name: 'Éxito',
+        frequencies: [523.25, 659.25, 783.99, 1046.50],
+        type: 'sine',
+        duration: 0.2,
+        gap: 0.1
+    }
+};
+
+function loadSoundPreferences() {
+    const saved = localStorage.getItem(SOUND_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : { selectedSound: 'gentle', muted: false };
+}
+
+function saveSoundPreferences(prefs) {
+    localStorage.setItem(SOUND_STORAGE_KEY, JSON.stringify(prefs));
+}
+
+function playSound(soundType = null) {
+    const prefs = loadSoundPreferences();
+
+    // Check if muted
+    if (prefs.muted) {
+        return;
+    }
+
+    const sound = SOUND_TONES[soundType || prefs.selectedSound] || SOUND_TONES.gentle;
+
     try {
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        sound.frequencies.forEach((freq, index) => {
+            const startTime = audioContext.currentTime + index * (sound.duration + sound.gap);
 
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
 
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = freq;
+            oscillator.type = sound.type;
+
+            gainNode.gain.setValueAtTime(0.3, startTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + sound.duration);
+
+            oscillator.start(startTime);
+            oscillator.stop(startTime + sound.duration);
+        });
     } catch (e) {
-        console.log('Audio not supported');
+        console.log('Audio not supported:', e);
     }
+}
+
+function playNotificationSound() {
+    playSound();
+}
+
+function initSoundSettings() {
+    const soundSelect = document.getElementById('soundSelect');
+    const previewBtn = document.getElementById('previewSound');
+    const muteToggle = document.getElementById('muteToggle');
+
+    if (!soundSelect || !previewBtn || !muteToggle) return;
+
+    // Load saved preferences
+    const prefs = loadSoundPreferences();
+    soundSelect.value = prefs.selectedSound;
+    muteToggle.checked = prefs.muted;
+
+    // Sound selection change
+    soundSelect.addEventListener('change', () => {
+        const newPrefs = loadSoundPreferences();
+        newPrefs.selectedSound = soundSelect.value;
+        saveSoundPreferences(newPrefs);
+    });
+
+    // Preview button
+    previewBtn.addEventListener('click', () => {
+        const wasMuted = loadSoundPreferences().muted;
+        // Temporarily unmute for preview
+        const prefs = loadSoundPreferences();
+        prefs.muted = false;
+        saveSoundPreferences(prefs);
+
+        playSound(soundSelect.value);
+
+        // Restore mute state after a delay
+        setTimeout(() => {
+            prefs.muted = wasMuted;
+            saveSoundPreferences(prefs);
+        }, 1000);
+    });
+
+    // Mute toggle
+    muteToggle.addEventListener('change', () => {
+        const newPrefs = loadSoundPreferences();
+        newPrefs.muted = muteToggle.checked;
+        saveSoundPreferences(newPrefs);
+    });
+}
+
+// ==================== PHASE 4: FOCUS MODE ====================
+
+let focusModeState = {
+    active: false,
+    intervalId: null
+};
+
+function initFocusMode() {
+    const focusBtn = document.getElementById('focusModeBtn');
+    const focusOverlay = document.getElementById('focusOverlay');
+    const focusClose = document.getElementById('focusClose');
+    const focusStart = document.getElementById('focusStart');
+    const focusPause = document.getElementById('focusPause');
+    const focusReset = document.getElementById('focusReset');
+
+    if (!focusBtn || !focusOverlay) return;
+
+    // Open focus mode
+    focusBtn.addEventListener('click', openFocusMode);
+
+    // Close focus mode
+    focusClose.addEventListener('click', closeFocusMode);
+
+    // ESC key to close
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && focusModeState.active) {
+            closeFocusMode();
+        }
+    });
+
+    // Focus mode controls - sync with main Pomodoro
+    focusStart.addEventListener('click', () => {
+        startPomodoro();
+        updateFocusControls();
+    });
+
+    focusPause.addEventListener('click', () => {
+        pausePomodoro();
+        updateFocusControls();
+    });
+
+    focusReset.addEventListener('click', () => {
+        resetPomodoro();
+        updateFocusControls();
+    });
+}
+
+function openFocusMode() {
+    const focusOverlay = document.getElementById('focusOverlay');
+    focusModeState.active = true;
+    focusOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Set current task based on time of day
+    updateFocusTask();
+
+    // Sync timer display
+    updateFocusTimer();
+    updateFocusControls();
+
+    // Start syncing timer with main Pomodoro
+    focusModeState.intervalId = setInterval(() => {
+        updateFocusTimer();
+        updateFocusControls();
+    }, 100);
+
+    // Focus trap - focus the first button
+    const focusStart = document.getElementById('focusStart');
+    if (focusStart) focusStart.focus();
+}
+
+function closeFocusMode() {
+    const focusOverlay = document.getElementById('focusOverlay');
+    focusModeState.active = false;
+    focusOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+
+    if (focusModeState.intervalId) {
+        clearInterval(focusModeState.intervalId);
+        focusModeState.intervalId = null;
+    }
+}
+
+function updateFocusTimer() {
+    const focusTime = document.getElementById('focusTime');
+    const focusStatus = document.getElementById('focusStatus');
+
+    if (focusTime && focusStatus) {
+        const minutes = Math.floor(pomodoroState.timeLeft / 60);
+        const seconds = pomodoroState.timeLeft % 60;
+        focusTime.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+        if (pomodoroState.isRunning) {
+            focusStatus.textContent = '⏱️ ¡En progreso!';
+        } else if (pomodoroState.timeLeft <= 0) {
+            focusStatus.textContent = '🎉 ¡Completado!';
+        } else {
+            focusStatus.textContent = 'Listo para empezar';
+        }
+    }
+}
+
+function updateFocusControls() {
+    const focusStart = document.getElementById('focusStart');
+    const focusPause = document.getElementById('focusPause');
+
+    if (focusStart) focusStart.disabled = pomodoroState.isRunning;
+    if (focusPause) focusPause.disabled = !pomodoroState.isRunning;
+}
+
+function updateFocusTask() {
+    const focusTaskName = document.getElementById('focusTaskName');
+    if (!focusTaskName) return;
+
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const today = now.getDay();
+    const dayIndex = today === 0 ? 6 : today - 1;
+
+    const daySchedule = scheduleData[dayIndex] || [];
+    let currentTask = 'Tiempo libre';
+
+    for (const slot of daySchedule) {
+        const [slotHour, slotMin] = slot.start.split(':').map(Number);
+        const slotStartMinutes = slotHour * 60 + slotMin;
+        const slotEndMinutes = slotStartMinutes + slot.duration;
+        const currentTotalMinutes = currentHour * 60 + currentMinutes;
+
+        if (currentTotalMinutes >= slotStartMinutes && currentTotalMinutes < slotEndMinutes) {
+            currentTask = slot.activity.name;
+            break;
+        }
+    }
+
+    focusTaskName.textContent = currentTask;
+}
+
+// ==================== PHASE 5: GOALS SYSTEM ====================
+
+const GOALS_STORAGE_KEY = 'weekly_goals';
+
+function loadGoals() {
+    const saved = localStorage.getItem(GOALS_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {
+        datacamp: 8,
+        platzi: 8,
+        exercise: 7,
+        celebratedGoals: {}
+    };
+}
+
+function saveGoals(goals) {
+    localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals));
+}
+
+function initGoals() {
+    const configBtn = document.getElementById('goalsConfigBtn');
+    const goalsModal = document.getElementById('goalsModal');
+    const goalsModalClose = document.getElementById('goalsModalClose');
+    const goalsForm = document.getElementById('goalsForm');
+    const celebration = document.getElementById('goalCelebration');
+
+    if (!configBtn || !goalsModal) return;
+
+    // Load saved goals
+    const goals = loadGoals();
+    updateGoalInputs(goals);
+    updateGoalTargets(goals);
+    updateGoalProgress();
+
+    // Open config modal
+    configBtn.addEventListener('click', () => {
+        goalsModal.classList.add('active');
+    });
+
+    // Close config modal
+    goalsModalClose.addEventListener('click', () => {
+        goalsModal.classList.remove('active');
+    });
+
+    // Close on backdrop click
+    goalsModal.addEventListener('click', (e) => {
+        if (e.target === goalsModal) {
+            goalsModal.classList.remove('active');
+        }
+    });
+
+    // Save goals form
+    goalsForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const newGoals = loadGoals();
+        newGoals.datacamp = parseInt(document.getElementById('datacampGoalInput').value) || 8;
+        newGoals.platzi = parseInt(document.getElementById('platziGoalInput').value) || 8;
+        newGoals.exercise = parseInt(document.getElementById('exerciseGoalInput').value) || 7;
+        saveGoals(newGoals);
+        updateGoalTargets(newGoals);
+        updateGoalProgress();
+        goalsModal.classList.remove('active');
+    });
+
+    // Close celebration on click
+    celebration.addEventListener('click', () => {
+        celebration.classList.remove('active');
+    });
+}
+
+function updateGoalInputs(goals) {
+    const datacampInput = document.getElementById('datacampGoalInput');
+    const platziInput = document.getElementById('platziGoalInput');
+    const exerciseInput = document.getElementById('exerciseGoalInput');
+
+    if (datacampInput) datacampInput.value = goals.datacamp;
+    if (platziInput) platziInput.value = goals.platzi;
+    if (exerciseInput) exerciseInput.value = goals.exercise;
+}
+
+function updateGoalTargets(goals) {
+    document.getElementById('datacampGoalTarget').textContent = goals.datacamp;
+    document.getElementById('platziGoalTarget').textContent = goals.platzi;
+    document.getElementById('exerciseGoalTarget').textContent = goals.exercise;
+}
+
+function updateGoalProgress() {
+    const goals = loadGoals();
+    const completed = loadCompleted();
+    const weekKey = getWeekKey();
+
+    // Calculate hours for each activity this week
+    let datacampHours = 0;
+    let platziHours = 0;
+    let exerciseDays = new Set();
+
+    // Check last 7 days
+    for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const dayData = completed[dateKey] || {};
+
+        const dayOfWeek = date.getDay();
+        const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const daySchedule = scheduleData[dayIndex] || [];
+
+        Object.keys(dayData).forEach(key => {
+            if (!dayData[key]) return;
+            const [d, s] = key.split('-').map(Number);
+            if (d !== dayIndex) return;
+
+            const slot = daySchedule[s];
+            if (!slot) return;
+
+            if (slot.activity.class === 'datacamp') {
+                datacampHours += slot.duration / 60;
+            } else if (slot.activity.class === 'platzi') {
+                platziHours += slot.duration / 60;
+            } else if (slot.activity.class === 'exercise') {
+                exerciseDays.add(dateKey);
+            }
+        });
+    }
+
+    // Update UI
+    const dcCurrent = document.getElementById('datacampGoalCurrent');
+    const pzCurrent = document.getElementById('platziGoalCurrent');
+    const exCurrent = document.getElementById('exerciseGoalCurrent');
+
+    if (dcCurrent) dcCurrent.textContent = datacampHours.toFixed(1);
+    if (pzCurrent) pzCurrent.textContent = platziHours.toFixed(1);
+    if (exCurrent) exCurrent.textContent = exerciseDays.size;
+
+    // Update progress bars
+    const dcBar = document.getElementById('datacampGoalBar');
+    const pzBar = document.getElementById('platziGoalBar');
+    const exBar = document.getElementById('exerciseGoalBar');
+
+    const dcPercent = Math.min((datacampHours / goals.datacamp) * 100, 100);
+    const pzPercent = Math.min((platziHours / goals.platzi) * 100, 100);
+    const exPercent = Math.min((exerciseDays.size / goals.exercise) * 100, 100);
+
+    if (dcBar) dcBar.style.width = dcPercent + '%';
+    if (pzBar) pzBar.style.width = pzPercent + '%';
+    if (exBar) exBar.style.width = exPercent + '%';
+
+    // Mark completed goals
+    document.querySelectorAll('.goal-item').forEach(item => {
+        const goal = item.dataset.goal;
+        let isComplete = false;
+        if (goal === 'datacamp') isComplete = datacampHours >= goals.datacamp;
+        if (goal === 'platzi') isComplete = platziHours >= goals.platzi;
+        if (goal === 'exercise') isComplete = exerciseDays.size >= goals.exercise;
+        item.classList.toggle('completed', isComplete);
+    });
+
+    // Check for celebration
+    checkGoalCelebration(goals, datacampHours, platziHours, exerciseDays.size);
+}
+
+function getWeekKey() {
+    const now = new Date();
+    const start = new Date(now);
+    start.setDate(start.getDate() - start.getDay());
+    return start.toISOString().split('T')[0];
+}
+
+function checkGoalCelebration(goals, dcHours, pzHours, exDays) {
+    const weekKey = getWeekKey();
+    const savedGoals = loadGoals();
+
+    if (!savedGoals.celebratedGoals) {
+        savedGoals.celebratedGoals = {};
+    }
+    if (!savedGoals.celebratedGoals[weekKey]) {
+        savedGoals.celebratedGoals[weekKey] = {};
+    }
+
+    const celebrated = savedGoals.celebratedGoals[weekKey];
+
+    // Check each goal
+    if (dcHours >= goals.datacamp && !celebrated.datacamp) {
+        showCelebration('¡Completaste tu meta de DataCamp!', '📊');
+        celebrated.datacamp = true;
+        saveGoals(savedGoals);
+    } else if (pzHours >= goals.platzi && !celebrated.platzi) {
+        showCelebration('¡Completaste tu meta de Platzi!', '🚀');
+        celebrated.platzi = true;
+        saveGoals(savedGoals);
+    } else if (exDays >= goals.exercise && !celebrated.exercise) {
+        showCelebration('¡Completaste tu meta de Ejercicio!', '💪');
+        celebrated.exercise = true;
+        saveGoals(savedGoals);
+    }
+}
+
+function showCelebration(message, icon = '🎉') {
+    const celebration = document.getElementById('goalCelebration');
+    const celebrationIcon = celebration.querySelector('.celebration-icon');
+    const celebrationMessage = document.getElementById('celebrationMessage');
+
+    celebrationIcon.textContent = icon;
+    celebrationMessage.textContent = message;
+    celebration.classList.add('active');
+
+    playSound('success');
+
+    // Auto-hide after 4 seconds
+    setTimeout(() => {
+        celebration.classList.remove('active');
+    }, 4000);
+}
+
+// ==================== PHASE 5: NOTES SYSTEM ====================
+
+let currentNoteData = { dayIndex: null, slotIndex: null };
+
+function initNotes() {
+    const notesModal = document.getElementById('notesModal');
+    const notesModalClose = document.getElementById('notesModalClose');
+    const notesForm = document.getElementById('notesForm');
+    const deleteNoteBtn = document.getElementById('deleteNoteBtn');
+
+    if (!notesModal) return;
+
+    // Close modal
+    notesModalClose.addEventListener('click', () => {
+        notesModal.classList.remove('active');
+    });
+
+    // Close on backdrop click
+    notesModal.addEventListener('click', (e) => {
+        if (e.target === notesModal) {
+            notesModal.classList.remove('active');
+        }
+    });
+
+    // Save note
+    notesForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveNote();
+    });
+
+    // Delete note
+    deleteNoteBtn.addEventListener('click', deleteNote);
+}
+
+function openNoteModal(dayIndex, slotIndex) {
+    const notesModal = document.getElementById('notesModal');
+    const noteActivityInfo = document.getElementById('noteActivityInfo');
+    const noteTextarea = document.getElementById('noteTextarea');
+
+    currentNoteData = { dayIndex, slotIndex };
+
+    // Get activity info
+    const daySchedule = scheduleData[dayIndex] || [];
+    const slot = daySchedule[slotIndex];
+    const dayName = DAYS[dayIndex];
+
+    if (slot) {
+        noteActivityInfo.textContent = `${dayName} - ${slot.activity.name} (${slot.start})`;
+    }
+
+    // Load existing note
+    const noteKey = `note-${dayIndex}-${slotIndex}`;
+    const savedNote = localStorage.getItem(noteKey) || '';
+    noteTextarea.value = savedNote;
+
+    notesModal.classList.add('active');
+    noteTextarea.focus();
+}
+
+function saveNote() {
+    const noteTextarea = document.getElementById('noteTextarea');
+    const notesModal = document.getElementById('notesModal');
+    const { dayIndex, slotIndex } = currentNoteData;
+
+    const noteKey = `note-${dayIndex}-${slotIndex}`;
+    const noteText = noteTextarea.value.trim();
+
+    if (noteText) {
+        localStorage.setItem(noteKey, noteText);
+    } else {
+        localStorage.removeItem(noteKey);
+    }
+
+    // Update note button indicator
+    updateNoteIndicator(dayIndex, slotIndex, !!noteText);
+
+    notesModal.classList.remove('active');
+}
+
+function deleteNote() {
+    const noteTextarea = document.getElementById('noteTextarea');
+    const notesModal = document.getElementById('notesModal');
+    const { dayIndex, slotIndex } = currentNoteData;
+
+    const noteKey = `note-${dayIndex}-${slotIndex}`;
+    localStorage.removeItem(noteKey);
+    noteTextarea.value = '';
+
+    // Update note button indicator
+    updateNoteIndicator(dayIndex, slotIndex, false);
+
+    notesModal.classList.remove('active');
+}
+
+function updateNoteIndicator(dayIndex, slotIndex, hasNote) {
+    const cell = document.querySelector(`[data-day="${dayIndex}"][data-slot="${slotIndex}"]`);
+    if (cell) {
+        const noteBtn = cell.querySelector('.note-btn');
+        if (noteBtn) {
+            noteBtn.classList.toggle('has-note', hasNote);
+        }
+    }
+}
+
+// ==================== PHASE 6: FIREBASE AUTH & SYNC ====================
+
+function initFirebaseAuth() {
+    const cloudBtn = document.getElementById('cloudBtn');
+    const authModal = document.getElementById('authModal');
+    const authModalClose = document.getElementById('authModalClose');
+    const authTabs = document.querySelectorAll('.auth-tab');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const syncNowBtn = document.getElementById('syncNowBtn');
+
+    if (!cloudBtn || !authModal || !firebaseAuth) return;
+
+    // Auth state listener
+    firebaseAuth.onAuthStateChanged(user => {
+        currentUser = user;
+        updateAuthUI(user);
+        if (user) {
+            loadFromCloud();
+        }
+    });
+
+    // Open auth modal
+    cloudBtn.addEventListener('click', () => {
+        authModal.classList.add('active');
+    });
+
+    // Close modal
+    authModalClose.addEventListener('click', () => {
+        authModal.classList.remove('active');
+    });
+
+    authModal.addEventListener('click', (e) => {
+        if (e.target === authModal) {
+            authModal.classList.remove('active');
+        }
+    });
+
+    // Tab switching
+    authTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            authTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            if (tab.dataset.tab === 'login') {
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+            } else {
+                loginForm.style.display = 'none';
+                registerForm.style.display = 'block';
+            }
+        });
+    });
+
+    // Login
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        const errorEl = document.getElementById('loginError');
+
+        try {
+            errorEl.textContent = '';
+            await firebaseAuth.signInWithEmailAndPassword(email, password);
+            authModal.classList.remove('active');
+        } catch (error) {
+            errorEl.textContent = getAuthErrorMessage(error.code);
+        }
+    });
+
+    // Register
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('registerEmail').value;
+        const password = document.getElementById('registerPassword').value;
+        const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+        const errorEl = document.getElementById('registerError');
+
+        if (password !== passwordConfirm) {
+            errorEl.textContent = 'Las contraseñas no coinciden';
+            return;
+        }
+
+        try {
+            errorEl.textContent = '';
+            await firebaseAuth.createUserWithEmailAndPassword(email, password);
+            await saveToCloud();
+            authModal.classList.remove('active');
+        } catch (error) {
+            errorEl.textContent = getAuthErrorMessage(error.code);
+        }
+    });
+
+    // Logout
+    logoutBtn.addEventListener('click', async () => {
+        await firebaseAuth.signOut();
+        authModal.classList.remove('active');
+    });
+
+    // Sync now
+    syncNowBtn.addEventListener('click', async () => {
+        await saveToCloud();
+        updateLastSyncTime();
+    });
+}
+
+function updateAuthUI(user) {
+    const userInfo = document.getElementById('userInfo');
+    const userEmail = document.getElementById('userEmail');
+    const cloudBtn = document.getElementById('cloudBtn');
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const loggedInView = document.getElementById('loggedInView');
+    const profileEmail = document.getElementById('profileEmail');
+    const authTabs = document.querySelector('.auth-tabs');
+
+    if (user) {
+        // Logged in
+        userInfo.style.display = 'flex';
+        userEmail.textContent = user.email.split('@')[0];
+        cloudBtn.innerHTML = '☁️ ✓';
+        cloudBtn.title = 'Sincronizado';
+
+        // Modal view
+        if (loginForm) loginForm.style.display = 'none';
+        if (registerForm) registerForm.style.display = 'none';
+        if (authTabs) authTabs.style.display = 'none';
+        if (loggedInView) loggedInView.style.display = 'block';
+        if (profileEmail) profileEmail.textContent = user.email;
+    } else {
+        // Logged out
+        userInfo.style.display = 'none';
+        cloudBtn.innerHTML = '☁️ Sync';
+        cloudBtn.title = 'Sincronizar con la nube';
+
+        // Modal view
+        if (loginForm) loginForm.style.display = 'block';
+        if (registerForm) registerForm.style.display = 'none';
+        if (authTabs) authTabs.style.display = 'flex';
+        if (loggedInView) loggedInView.style.display = 'none';
+    }
+}
+
+async function saveToCloud() {
+    if (!currentUser || !firebaseDb) return;
+
+    const syncStatus = document.getElementById('syncStatus');
+    if (syncStatus) {
+        syncStatus.textContent = '🔄';
+        syncStatus.classList.add('syncing');
+    }
+
+    try {
+        const userData = {
+            completed: loadCompleted(),
+            goals: loadGoals(),
+            scheduleData: scheduleData,
+            updatedAt: new Date().toISOString()
+        };
+
+        // Also collect notes
+        const notes = {};
+        for (let d = 0; d < 7; d++) {
+            const daySchedule = scheduleData[d] || [];
+            for (let s = 0; s < daySchedule.length; s++) {
+                const noteKey = `note-${d}-${s}`;
+                const note = localStorage.getItem(noteKey);
+                if (note) notes[noteKey] = note;
+            }
+        }
+        userData.notes = notes;
+
+        await firebaseDb.collection('users').doc(currentUser.uid).set(userData);
+
+        if (syncStatus) {
+            syncStatus.textContent = '✓';
+            syncStatus.classList.remove('syncing');
+        }
+
+        updateLastSyncTime();
+        console.log('Data saved to cloud');
+    } catch (error) {
+        console.error('Error saving to cloud:', error);
+        if (syncStatus) {
+            syncStatus.textContent = '⚠️';
+            syncStatus.classList.remove('syncing');
+        }
+    }
+}
+
+async function loadFromCloud() {
+    if (!currentUser || !firebaseDb) return;
+
+    try {
+        const doc = await firebaseDb.collection('users').doc(currentUser.uid).get();
+
+        if (doc.exists) {
+            const data = doc.data();
+
+            // Load completed tasks
+            if (data.completed) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data.completed));
+            }
+
+            // Load goals
+            if (data.goals) {
+                localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(data.goals));
+            }
+
+            // Load notes
+            if (data.notes) {
+                Object.keys(data.notes).forEach(key => {
+                    localStorage.setItem(key, data.notes[key]);
+                });
+            }
+
+            // Refresh UI
+            generateSchedule();
+            updateProgress();
+            updateGoalProgress();
+
+            console.log('Data loaded from cloud');
+            updateLastSyncTime();
+        }
+    } catch (error) {
+        console.error('Error loading from cloud:', error);
+    }
+}
+
+function updateLastSyncTime() {
+    const lastSyncEl = document.getElementById('lastSyncTime');
+    if (lastSyncEl) {
+        const now = new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        lastSyncEl.textContent = `Última sincronización: ${now}`;
+    }
+}
+
+function getAuthErrorMessage(code) {
+    const messages = {
+        'auth/email-already-in-use': 'Este correo ya está registrado',
+        'auth/invalid-email': 'Correo electrónico inválido',
+        'auth/operation-not-allowed': 'Operación no permitida',
+        'auth/weak-password': 'La contraseña es muy débil',
+        'auth/user-disabled': 'Usuario deshabilitado',
+        'auth/user-not-found': 'Usuario no encontrado',
+        'auth/wrong-password': 'Contraseña incorrecta',
+        'auth/invalid-credential': 'Credenciales inválidas'
+    };
+    return messages[code] || 'Error de autenticación';
+}
+
+// ==================== PHASE 5: CALENDAR SYSTEM ====================
+
+
+const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+let currentCalendarDate = new Date();
+
+function initCalendar() {
+    const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+    const calendarSection = document.getElementById('calendarSection');
+    const prevMonthBtn = document.getElementById('prevMonth');
+    const nextMonthBtn = document.getElementById('nextMonth');
+    const dayDetailModal = document.getElementById('dayDetailModal');
+    const dayDetailClose = document.getElementById('dayDetailClose');
+
+    if (!viewHistoryBtn || !calendarSection) return;
+
+    // Toggle calendar visibility
+    viewHistoryBtn.addEventListener('click', () => {
+        const isVisible = calendarSection.style.display !== 'none';
+        calendarSection.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            renderCalendar();
+        }
+    });
+
+    // Month navigation
+    prevMonthBtn.addEventListener('click', () => {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+        renderCalendar();
+    });
+
+    nextMonthBtn.addEventListener('click', () => {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+        renderCalendar();
+    });
+
+    // Day detail modal close
+    dayDetailClose.addEventListener('click', () => {
+        dayDetailModal.classList.remove('active');
+    });
+
+    dayDetailModal.addEventListener('click', (e) => {
+        if (e.target === dayDetailModal) {
+            dayDetailModal.classList.remove('active');
+        }
+    });
+}
+
+function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const monthLabel = document.getElementById('currentMonthLabel');
+    const completed = loadCompleted();
+
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+
+    monthLabel.textContent = `${MONTHS_ES[month]} ${year}`;
+
+    // Get first day of month and days in month
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+
+    // Get starting day (Monday = 0)
+    let startingDay = firstDay.getDay() - 1;
+    if (startingDay < 0) startingDay = 6;
+
+    grid.innerHTML = '';
+
+    // Empty cells for days before month starts
+    for (let i = 0; i < startingDay; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'calendar-day empty';
+        grid.appendChild(emptyCell);
+    }
+
+    // Actual days
+    const today = new Date();
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayCell = document.createElement('div');
+        dayCell.className = 'calendar-day';
+
+        const dateKey = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+        const dayData = completed[dateKey] || {};
+        const taskCount = Object.values(dayData).filter(v => v).length;
+
+        // Check if today
+        if (today.getFullYear() === year && today.getMonth() === month && today.getDate() === day) {
+            dayCell.classList.add('today');
+        }
+
+        // Add task level class
+        if (taskCount >= 7) {
+            dayCell.classList.add('has-tasks-high');
+        } else if (taskCount >= 4) {
+            dayCell.classList.add('has-tasks-medium');
+        } else if (taskCount > 0) {
+            dayCell.classList.add('has-tasks-low');
+        }
+
+        dayCell.innerHTML = `
+            <span class="day-number">${day}</span>
+            ${taskCount > 0 ? `<span class="day-tasks">${taskCount} ✓</span>` : ''}
+        `;
+
+        dayCell.addEventListener('click', () => openDayDetail(dateKey, day));
+
+        grid.appendChild(dayCell);
+    }
+}
+
+function openDayDetail(dateKey, dayNumber) {
+    const modal = document.getElementById('dayDetailModal');
+    const title = document.getElementById('dayDetailTitle');
+    const content = document.getElementById('dayDetailContent');
+
+    const completed = loadCompleted();
+    const dayData = completed[dateKey] || {};
+
+    const date = new Date(dateKey);
+    const dayOfWeek = date.getDay();
+    const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const daySchedule = scheduleData[dayIndex] || [];
+
+    title.textContent = `${DAYS[dayIndex]} ${dayNumber} - ${dateKey}`;
+
+    if (daySchedule.length === 0 || Object.keys(dayData).length === 0) {
+        content.innerHTML = '<p style="text-align:center; color: var(--text-secondary);">No hay actividades registradas para este día.</p>';
+    } else {
+        content.innerHTML = daySchedule.map((slot, slotIndex) => {
+            const key = `${dayIndex}-${slotIndex}`;
+            const isCompleted = dayData[key] || false;
+            const activityClass = slot.activity.class;
+
+            if (activityClass === 'free' || activityClass === 'break') return '';
+
+            return `
+                <div class="day-detail-item ${isCompleted ? 'completed' : ''}">
+                    <span class="task-icon">${isCompleted ? '✅' : '⬜'}</span>
+                    <div class="task-info">
+                        <div class="task-name">${slot.activity.name}</div>
+                        <div class="task-time">${slot.start} - ${slot.duration}min</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    modal.classList.add('active');
+}
+
+// ==================== PHASE 5: PDF EXPORT ====================
+
+function initPdfExport() {
+    const exportBtn = document.getElementById('exportPdfBtn');
+
+    if (!exportBtn) return;
+
+    exportBtn.addEventListener('click', generatePdf);
+}
+
+function generatePdf() {
+    // Check if jsPDF is loaded
+    if (typeof window.jspdf === 'undefined') {
+        alert('Error: La librería de PDF no se cargó correctamente. Por favor recarga la página.');
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const goals = loadGoals();
+    const completed = loadCompleted();
+
+    // Calculate weekly stats
+    let datacampHours = 0, platziHours = 0, exerciseDays = 0, totalTasks = 0;
+
+    for (let i = 0; i < 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+        const dayData = completed[dateKey] || {};
+        const dayOfWeek = date.getDay();
+        const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        const daySchedule = scheduleData[dayIndex] || [];
+
+        Object.keys(dayData).forEach(key => {
+            if (!dayData[key]) return;
+            const [d, s] = key.split('-').map(Number);
+            if (d !== dayIndex) return;
+
+            const slot = daySchedule[s];
+            if (!slot) return;
+
+            totalTasks++;
+            if (slot.activity.class === 'datacamp') datacampHours += slot.duration / 60;
+            if (slot.activity.class === 'platzi') platziHours += slot.duration / 60;
+            if (slot.activity.class === 'exercise') exerciseDays++;
+        });
+    }
+
+    // Generate PDF content
+    const today = new Date().toLocaleDateString('es-ES', {
+        year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    // Header
+    doc.setFontSize(24);
+    doc.setTextColor(102, 126, 234);
+    doc.text('Mi Horario Semanal', 105, 20, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.setTextColor(100);
+    doc.text(`Reporte generado: ${today}`, 105, 30, { align: 'center' });
+
+    // Divider
+    doc.setDrawColor(102, 126, 234);
+    doc.line(20, 35, 190, 35);
+
+    // Weekly Stats
+    doc.setFontSize(16);
+    doc.setTextColor(0);
+    doc.text('📊 Estadísticas de la Semana', 20, 50);
+
+    doc.setFontSize(12);
+    let y = 65;
+
+    doc.text(`📊 DataCamp: ${datacampHours.toFixed(1)}h / ${goals.datacamp}h meta`, 25, y);
+    y += 10;
+    doc.text(`🚀 Platzi: ${platziHours.toFixed(1)}h / ${goals.platzi}h meta`, 25, y);
+    y += 10;
+    doc.text(`💪 Ejercicio: ${exerciseDays} días / ${goals.exercise} días meta`, 25, y);
+    y += 10;
+    doc.text(`✅ Total tareas completadas: ${totalTasks}`, 25, y);
+
+    // Goals Progress
+    y += 20;
+    doc.setFontSize(16);
+    doc.text('🎯 Progreso de Metas', 20, y);
+
+    y += 15;
+    doc.setFontSize(12);
+
+    const dcProgress = Math.min((datacampHours / goals.datacamp) * 100, 100);
+    const pzProgress = Math.min((platziHours / goals.platzi) * 100, 100);
+    const exProgress = Math.min((exerciseDays / goals.exercise) * 100, 100);
+
+    doc.text(`DataCamp: ${dcProgress.toFixed(0)}% completado`, 25, y);
+    y += 8;
+    doc.text(`Platzi: ${pzProgress.toFixed(0)}% completado`, 25, y);
+    y += 8;
+    doc.text(`Ejercicio: ${exProgress.toFixed(0)}% completado`, 25, y);
+
+    // Tips
+    y += 20;
+    doc.setFontSize(16);
+    doc.text('💡 Recomendaciones', 20, y);
+
+    y += 15;
+    doc.setFontSize(11);
+    doc.setTextColor(80);
+
+    if (dcProgress < 50) {
+        doc.text('• Dedica más tiempo a DataCamp para alcanzar tu meta', 25, y);
+        y += 8;
+    }
+    if (pzProgress < 50) {
+        doc.text('• Aumenta las sesiones de Platzi esta semana', 25, y);
+        y += 8;
+    }
+    if (exProgress < 50) {
+        doc.text('• Recuerda hacer ejercicio para mantener tu racha', 25, y);
+        y += 8;
+    }
+    if (dcProgress >= 100 && pzProgress >= 100 && exProgress >= 100) {
+        doc.text('🎉 ¡Excelente! Has cumplido todas tus metas esta semana', 25, y);
+    }
+
+    // Footer
+    doc.setFontSize(10);
+    doc.setTextColor(150);
+    doc.text('Generado por Mi Horario Semanal', 105, 280, { align: 'center' });
+
+    // Save PDF
+    doc.save(`horario_reporte_${new Date().toISOString().split('T')[0]}.pdf`);
 }
 
 // ==================== PHASE 2: REMINDERS ====================
@@ -969,6 +2105,10 @@ toggleComplete = function (dayIndex, slotIndex) {
         updateStreak();
         updateWeeklyStats();
         renderAchievements();
+        // Cloud sync (Phase 6)
+        if (typeof currentUser !== 'undefined' && currentUser && typeof saveToCloud === 'function') {
+            saveToCloud();
+        }
     }, 100);
 };
 
@@ -1315,8 +2455,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== ADVANCED STATISTICS ====================
 
-const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+// MONTHS_ES already defined in Phase 5 Calendar section
 
 let currentHistoryMonth = new Date();
 

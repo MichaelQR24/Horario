@@ -10,19 +10,35 @@
     <title>Mi Horario Semanal</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- jsPDF for PDF export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
 </head>
 <body>
+    <!-- Skip Link for Accessibility -->
+    <a href="#scheduleGrid" class="skip-link">Saltar al horario</a>
+    
     <div class="container">
         <header class="header">
             <div class="header-top">
                 <div class="data-controls">
-                    <button class="control-btn edit-mode-btn" id="editModeBtn" title="Modo Edición">✏️ Editar</button>
-                    <button class="control-btn" id="exportBtn" title="Exportar datos">📥 Exportar</button>
-                    <button class="control-btn" id="importBtn" title="Importar datos">📤 Importar</button>
-                    <input type="file" id="importFile" accept=".json" style="display:none">
+                    <button class="control-btn edit-mode-btn" id="editModeBtn" title="Modo Edición" aria-label="Activar modo edición">✏️ Editar</button>
+                    <button class="control-btn focus-btn" id="focusModeBtn" title="Modo Focus" aria-label="Activar modo focus para concentración">🎯 Focus</button>
+                    <button class="control-btn" id="exportBtn" title="Exportar datos" aria-label="Exportar datos a archivo JSON">📥 Exportar</button>
+                    <button class="control-btn" id="importBtn" title="Importar datos" aria-label="Importar datos desde archivo JSON">📤 Importar</button>
+                    <input type="file" id="importFile" accept=".json" style="display:none" aria-hidden="true">
+                    <button class="control-btn cloud-btn" id="cloudBtn" title="Sincronizar con la nube" aria-label="Iniciar sesión o sincronizar">☁️ Sync</button>
                 </div>
-                <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
-                    <span class="theme-icon">🌙</span>
+                <div class="user-info" id="userInfo" style="display:none">
+                    <span class="user-email" id="userEmail"></span>
+                    <span class="sync-status" id="syncStatus">✓</span>
+                </div>
+                <button class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Cambiar entre tema claro y oscuro">
+                    <span class="theme-icon" aria-hidden="true">🌙</span>
                 </button>
             </div>
             <h1>📅 Mi Horario Semanal</h1>
@@ -37,43 +53,60 @@
             </div>
             
             <!-- Pomodoro Timer -->
-            <div class="pomodoro-widget" id="pomodoroWidget">
+            <div class="pomodoro-widget" id="pomodoroWidget" role="timer" aria-label="Temporizador Pomodoro">
                 <div class="pomodoro-display">
-                    <span class="pomodoro-time" id="pomodoroTime">45:00</span>
-                    <span class="pomodoro-label" id="pomodoroLabel">Listo para empezar</span>
+                    <span class="pomodoro-time" id="pomodoroTime" aria-live="polite" aria-atomic="true">45:00</span>
+                    <span class="pomodoro-label" id="pomodoroLabel" aria-live="polite">Listo para empezar</span>
                 </div>
-                <div class="pomodoro-controls">
-                    <button class="pomodoro-btn start" id="pomodoroStart" title="Iniciar">▶️</button>
-                    <button class="pomodoro-btn pause" id="pomodoroPause" title="Pausar" disabled>⏸️</button>
-                    <button class="pomodoro-btn reset" id="pomodoroReset" title="Reiniciar">🔄</button>
+                <div class="pomodoro-controls" role="group" aria-label="Controles del temporizador">
+                    <button class="pomodoro-btn start" id="pomodoroStart" title="Iniciar" aria-label="Iniciar temporizador">▶️</button>
+                    <button class="pomodoro-btn pause" id="pomodoroPause" title="Pausar" aria-label="Pausar temporizador" disabled>⏸️</button>
+                    <button class="pomodoro-btn reset" id="pomodoroReset" title="Reiniciar" aria-label="Reiniciar temporizador">🔄</button>
                 </div>
-                <div class="pomodoro-presets">
-                    <button class="preset-btn active" data-time="45">45 min</button>
-                    <button class="preset-btn" data-time="25">25 min</button>
-                    <button class="preset-btn" data-time="15">15 min</button>
+                <div class="pomodoro-presets" role="group" aria-label="Duraciones predefinidas">
+                    <button class="preset-btn active" data-time="45" aria-pressed="true">45 min</button>
+                    <button class="preset-btn" data-time="25" aria-pressed="false">25 min</button>
+                    <button class="preset-btn" data-time="15" aria-pressed="false">15 min</button>
                 </div>
             </div>
         </header>
 
         <!-- Reminders Panel -->
-        <div class="reminders-panel" id="remindersPanel">
+        <div class="reminders-panel" id="remindersPanel" role="region" aria-label="Panel de recordatorios">
             <div class="reminder-item">
-                <span>💧 Recordatorio de hidratación</span>
+                <label for="hydrationReminder">💧 Recordatorio de hidratación</label>
                 <label class="toggle-switch">
                     <input type="checkbox" id="hydrationReminder" checked>
-                    <span class="slider"></span>
+                    <span class="slider" aria-hidden="true"></span>
                 </label>
             </div>
             <div class="reminder-item">
-                <span>👁️ Descanso visual (20-20-20)</span>
+                <label for="eyeRestReminder">👁️ Descanso visual (20-20-20)</label>
                 <label class="toggle-switch">
                     <input type="checkbox" id="eyeRestReminder" checked>
-                    <span class="slider"></span>
+                    <span class="slider" aria-hidden="true"></span>
                 </label>
             </div>
             <div class="reminder-item">
                 <span>🔔 Notificaciones del navegador</span>
-                <button class="notification-btn" id="enableNotifications">Activar</button>
+                <button class="notification-btn" id="enableNotifications" aria-label="Activar notificaciones del navegador">Activar</button>
+            </div>
+            <div class="reminder-item sound-settings">
+                <label for="soundSelect">🔊 Sonido de alarma</label>
+                <select id="soundSelect" class="sound-select" aria-label="Seleccionar tono de alarma">
+                    <option value="gentle">🎵 Suave</option>
+                    <option value="chime">🔔 Campana</option>
+                    <option value="alert">⚡ Alerta</option>
+                    <option value="success">✨ Éxito</option>
+                </select>
+                <button class="preview-btn" id="previewSound" aria-label="Previsualizar sonido">▶️</button>
+            </div>
+            <div class="reminder-item">
+                <label for="muteToggle">🔇 Silenciar sonidos</label>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="muteToggle">
+                    <span class="slider" aria-hidden="true"></span>
+                </label>
             </div>
         </div>
 
@@ -187,7 +220,113 @@
                     <!-- Generated by JavaScript -->
                 </div>
             </div>
+
+            <!-- Goals Panel -->
+            <div class="goals-container">
+                <div class="goals-header">
+                    <h3>🎯 Metas Semanales</h3>
+                    <button class="goals-config-btn" id="goalsConfigBtn" aria-label="Configurar metas">⚙️</button>
+                </div>
+                <div class="goals-grid" id="goalsGrid">
+                    <div class="goal-item" data-goal="datacamp">
+                        <div class="goal-info">
+                            <span class="goal-icon">📊</span>
+                            <div class="goal-details">
+                                <span class="goal-name">DataCamp</span>
+                                <span class="goal-progress-text"><span id="datacampGoalCurrent">0</span>h / <span id="datacampGoalTarget">8</span>h</span>
+                            </div>
+                        </div>
+                        <div class="goal-bar">
+                            <div class="goal-fill datacamp-fill" id="datacampGoalBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="goal-item" data-goal="platzi">
+                        <div class="goal-info">
+                            <span class="goal-icon">🚀</span>
+                            <div class="goal-details">
+                                <span class="goal-name">Platzi</span>
+                                <span class="goal-progress-text"><span id="platziGoalCurrent">0</span>h / <span id="platziGoalTarget">8</span>h</span>
+                            </div>
+                        </div>
+                        <div class="goal-bar">
+                            <div class="goal-fill platzi-fill" id="platziGoalBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="goal-item" data-goal="exercise">
+                        <div class="goal-info">
+                            <span class="goal-icon">💪</span>
+                            <div class="goal-details">
+                                <span class="goal-name">Ejercicio</span>
+                                <span class="goal-progress-text"><span id="exerciseGoalCurrent">0</span> / <span id="exerciseGoalTarget">7</span> días</span>
+                            </div>
+                        </div>
+                        <div class="goal-bar">
+                            <div class="goal-fill exercise-fill" id="exerciseGoalBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
+
+        <!-- Goals Config Modal -->
+        <div class="goals-modal" id="goalsModal" role="dialog" aria-modal="true" aria-labelledby="goalsModalTitle">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="goalsModalTitle">⚙️ Configurar Metas</h3>
+                    <button class="modal-close" id="goalsModalClose" aria-label="Cerrar">✕</button>
+                </div>
+                <form id="goalsForm">
+                    <div class="form-group">
+                        <label for="datacampGoalInput">📊 Meta DataCamp (horas/semana)</label>
+                        <input type="number" id="datacampGoalInput" min="1" max="40" value="8">
+                    </div>
+                    <div class="form-group">
+                        <label for="platziGoalInput">🚀 Meta Platzi (horas/semana)</label>
+                        <input type="number" id="platziGoalInput" min="1" max="40" value="8">
+                    </div>
+                    <div class="form-group">
+                        <label for="exerciseGoalInput">💪 Meta Ejercicio (días/semana)</label>
+                        <input type="number" id="exerciseGoalInput" min="1" max="7" value="7">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-save">💾 Guardar Metas</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Goal Celebration -->
+        <div class="goal-celebration" id="goalCelebration">
+            <div class="celebration-content">
+                <span class="celebration-icon">🎉</span>
+                <h3>¡Meta alcanzada!</h3>
+                <p id="celebrationMessage">¡Felicitaciones!</p>
+            </div>
+        </div>
+
+        <!-- Notes Modal -->
+        <div class="notes-modal" id="notesModal" role="dialog" aria-modal="true" aria-labelledby="notesModalTitle">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="notesModalTitle">📝 Notas de Actividad</h3>
+                    <button class="modal-close" id="notesModalClose" aria-label="Cerrar">✕</button>
+                </div>
+                <form id="notesForm">
+                    <div class="form-group">
+                        <label for="noteActivityInfo">Actividad</label>
+                        <div id="noteActivityInfo" class="note-activity-info">--</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="noteTextarea">Nota</label>
+                        <textarea id="noteTextarea" rows="4" placeholder="Escribe tu nota aquí... (ej: Curso de Python, Lección 5)"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-delete" id="deleteNoteBtn">🗑️ Eliminar</button>
+                        <button type="submit" class="btn-save">💾 Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <!-- Advanced Statistics Section -->
         <section class="advanced-stats">
@@ -234,20 +373,46 @@
 
             <!-- Action Buttons -->
             <div class="stats-actions">
-                <button class="stats-btn" id="viewHistoryBtn">📅 Ver Historial Mensual</button>
+                <button class="stats-btn" id="viewHistoryBtn">📅 Ver Calendario</button>
                 <button class="stats-btn primary" id="exportPdfBtn">📄 Exportar PDF</button>
             </div>
 
-            <!-- Monthly History Modal Content (hidden by default) -->
-            <div class="monthly-history" id="monthlyHistory" style="display:none">
-                <h3>📅 Historial Mensual</h3>
-                <div class="month-selector">
-                    <button class="month-nav" id="prevMonth">◀</button>
-                    <span id="currentMonthLabel">Enero 2026</span>
-                    <button class="month-nav" id="nextMonth">▶</button>
+            <!-- Monthly Calendar Section -->
+            <div class="calendar-section" id="calendarSection" style="display:none">
+                <div class="calendar-header">
+                    <button class="month-nav" id="prevMonth" aria-label="Mes anterior">◀</button>
+                    <h3 id="currentMonthLabel">Enero 2026</h3>
+                    <button class="month-nav" id="nextMonth" aria-label="Mes siguiente">▶</button>
                 </div>
-                <div class="month-stats" id="monthStats">
+                <div class="calendar-weekdays">
+                    <span>Lun</span>
+                    <span>Mar</span>
+                    <span>Mié</span>
+                    <span>Jue</span>
+                    <span>Vie</span>
+                    <span>Sáb</span>
+                    <span>Dom</span>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
                     <!-- Generated by JavaScript -->
+                </div>
+                <div class="calendar-legend">
+                    <span class="legend-item"><span class="legend-dot low"></span> 1-3 tareas</span>
+                    <span class="legend-item"><span class="legend-dot medium"></span> 4-6 tareas</span>
+                    <span class="legend-item"><span class="legend-dot high"></span> 7+ tareas</span>
+                </div>
+            </div>
+
+            <!-- Day Detail Modal -->
+            <div class="day-detail-modal" id="dayDetailModal" role="dialog" aria-modal="true">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="dayDetailTitle">Detalle del Día</h3>
+                        <button class="modal-close" id="dayDetailClose" aria-label="Cerrar">✕</button>
+                    </div>
+                    <div class="day-detail-content" id="dayDetailContent">
+                        <!-- Generated by JavaScript -->
+                    </div>
                 </div>
             </div>
         </section>
@@ -314,15 +479,15 @@
     </div>
 
     <!-- Edit Modal -->
-    <div class="edit-modal" id="editModal">
+    <div class="edit-modal" id="editModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 id="modalTitle">Editar Actividad</h3>
-                <button class="modal-close" id="modalClose">✕</button>
+                <button class="modal-close" id="modalClose" aria-label="Cerrar modal">✕</button>
             </div>
             <form id="editForm">
                 <div class="form-group">
-                    <label>Actividad</label>
+                    <label for="activitySelect">Actividad</label>
                     <select id="activitySelect" required>
                         <option value="WETALK">🗣️ WeTalk</option>
                         <option value="DATACAMP">📊 DataCamp</option>
@@ -338,24 +503,109 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Hora Inicio</label>
+                        <label for="startTime">Hora Inicio</label>
                         <input type="time" id="startTime" required>
                     </div>
                     <div class="form-group">
-                        <label>Duración (min)</label>
+                        <label for="duration">Duración (min)</label>
                         <input type="number" id="duration" min="15" max="180" step="15" value="45" required>
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn-delete" id="deleteBtn">🗑️ Eliminar</button>
-                    <button type="submit" class="btn-save">💾 Guardar</button>
+                    <button type="button" class="btn-delete" id="deleteBtn" aria-label="Eliminar esta actividad">🗑️ Eliminar</button>
+                    <button type="submit" class="btn-save" aria-label="Guardar cambios">💾 Guardar</button>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- Add Activity Button (floating) -->
-    <button class="fab-add" id="fabAdd" style="display:none" title="Agregar actividad">➕</button>
+    <button class="fab-add" id="fabAdd" style="display:none" title="Agregar actividad" aria-label="Agregar nueva actividad">➕</button>
+
+    <!-- Focus Mode Overlay -->
+    <div class="focus-overlay" id="focusOverlay" role="dialog" aria-modal="true" aria-label="Modo Focus">
+        <div class="focus-content">
+            <button class="focus-close" id="focusClose" aria-label="Salir del modo focus (ESC)">✕</button>
+            <div class="focus-header">
+                <span class="focus-icon" aria-hidden="true">🎯</span>
+                <h2>Modo Focus</h2>
+            </div>
+            <div class="focus-timer" role="timer" aria-live="polite">
+                <span class="focus-time" id="focusTime">45:00</span>
+                <span class="focus-status" id="focusStatus">Listo para empezar</span>
+            </div>
+            <div class="focus-task">
+                <span class="focus-task-label">Tarea actual:</span>
+                <span class="focus-task-name" id="focusTaskName">Ninguna seleccionada</span>
+            </div>
+            <div class="focus-controls" role="group" aria-label="Controles de focus">
+                <button class="focus-btn-control start" id="focusStart" aria-label="Iniciar">▶️ Iniciar</button>
+                <button class="focus-btn-control pause" id="focusPause" aria-label="Pausar" disabled>⏸️ Pausar</button>
+                <button class="focus-btn-control reset" id="focusReset" aria-label="Reiniciar">🔄 Reiniciar</button>
+            </div>
+            <p class="focus-hint">Presiona <kbd>ESC</kbd> para salir</p>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="auth-modal" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+        <div class="modal-content auth-content">
+            <button class="modal-close" id="authModalClose" aria-label="Cerrar">✕</button>
+            <div class="auth-header">
+                <span class="auth-icon">☁️</span>
+                <h3 id="authModalTitle">Sincronizar con la Nube</h3>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Iniciar Sesión</button>
+                <button class="auth-tab" data-tab="register">Registrarse</button>
+            </div>
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="loginEmail">Correo electrónico</label>
+                    <input type="email" id="loginEmail" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••">
+                </div>
+                <div class="auth-error" id="loginError"></div>
+                <button type="submit" class="btn-save auth-submit">🔐 Iniciar Sesión</button>
+            </form>
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form" style="display:none">
+                <div class="form-group">
+                    <label for="registerEmail">Correo electrónico</label>
+                    <input type="email" id="registerEmail" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Contraseña</label>
+                    <input type="password" id="registerPassword" required minlength="6" placeholder="Mínimo 6 caracteres">
+                </div>
+                <div class="form-group">
+                    <label for="registerPasswordConfirm">Confirmar contraseña</label>
+                    <input type="password" id="registerPasswordConfirm" required placeholder="Repetir contraseña">
+                </div>
+                <div class="auth-error" id="registerError"></div>
+                <button type="submit" class="btn-save auth-submit">📝 Crear Cuenta</button>
+            </form>
+            <!-- Logged In View -->
+            <div id="loggedInView" class="logged-in-view" style="display:none">
+                <div class="user-profile">
+                    <span class="profile-icon">👤</span>
+                    <span class="profile-email" id="profileEmail"></span>
+                </div>
+                <div class="sync-info">
+                    <p>✅ Tus datos están sincronizados con la nube</p>
+                    <p class="last-sync" id="lastSyncTime">Última sincronización: --</p>
+                </div>
+                <div class="auth-actions">
+                    <button class="btn-save sync-now-btn" id="syncNowBtn">🔄 Sincronizar Ahora</button>
+                    <button class="btn-delete logout-btn" id="logoutBtn">🚪 Cerrar Sesión</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>

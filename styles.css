@@ -4,6 +4,48 @@
     box-sizing: border-box;
 }
 
+/* ==================== ACCESSIBILITY FOCUS STYLES ==================== */
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+    outline: 3px solid #667eea;
+    outline-offset: 2px;
+}
+
+button:focus-visible,
+.control-btn:focus-visible,
+.pomodoro-btn:focus-visible,
+.preset-btn:focus-visible,
+.quick-link:focus-visible {
+    outline: 3px solid #00d4aa;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(0, 212, 170, 0.3);
+}
+
+input:focus-visible,
+select:focus-visible {
+    outline: 3px solid #667eea;
+    outline-offset: 0;
+    border-color: #667eea;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #667eea;
+    color: white;
+    padding: 8px 16px;
+    z-index: 100;
+    text-decoration: none;
+    border-radius: 0 0 8px 0;
+    transition: top 0.3s;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
 :root {
     --bg-primary: #0f0f1a;
     --bg-secondary: #1a1a2e;
@@ -887,6 +929,47 @@ body.light-theme ::-webkit-scrollbar-thumb:hover {
 .notification-btn:disabled {
     opacity: 0.7;
     cursor: default;
+}
+
+/* Sound Settings */
+.sound-settings {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sound-select {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.sound-select:hover {
+    border-color: var(--wetalk);
+}
+
+.preview-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+}
+
+.preview-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
 }
 
 /* Reminder Popup */
@@ -1877,5 +1960,942 @@ body.light-theme .legend-box.l0 {
 
     .stats-btn {
         width: 100%;
+    }
+}
+
+/* ==================== PHASE 4: FOCUS MODE ==================== */
+
+.focus-btn {
+    background: linear-gradient(135deg, #00d4aa, #00b894) !important;
+}
+
+.focus-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 15, 26, 0.98);
+    backdrop-filter: blur(20px);
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: focus-fade-in 0.3s ease;
+}
+
+.focus-overlay.active {
+    display: flex;
+}
+
+@keyframes focus-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.focus-content {
+    text-align: center;
+    max-width: 500px;
+    padding: 3rem;
+    position: relative;
+}
+
+.focus-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 50px;
+    height: 50px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 1.5rem;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.focus-close:hover {
+    background: rgba(255, 107, 107, 0.5);
+    transform: scale(1.1);
+}
+
+.focus-header {
+    margin-bottom: 2rem;
+}
+
+.focus-icon {
+    font-size: 4rem;
+    display: block;
+    margin-bottom: 1rem;
+    animation: focus-pulse 2s infinite;
+}
+
+@keyframes focus-pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+.focus-header h2 {
+    font-size: 2rem;
+    color: white;
+    margin: 0;
+}
+
+.focus-timer {
+    margin-bottom: 2rem;
+}
+
+.focus-time {
+    font-size: 6rem;
+    font-weight: 700;
+    font-family: 'Inter', monospace;
+    color: #00d4aa;
+    text-shadow: 0 0 40px rgba(0, 212, 170, 0.5);
+    display: block;
+    line-height: 1;
+}
+
+.focus-status {
+    display: block;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    margin-top: 1rem;
+}
+
+.focus-task {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.5rem;
+    border-radius: 16px;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.focus-task-label {
+    display: block;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.focus-task-name {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: white;
+}
+
+.focus-controls {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.focus-btn-control {
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.focus-btn-control.start {
+    background: linear-gradient(135deg, #00d4aa, #00b894);
+    color: #000;
+}
+
+.focus-btn-control.pause {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #000;
+}
+
+.focus-btn-control.reset {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.focus-btn-control:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.focus-btn-control:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.focus-hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.focus-hint kbd {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-family: inherit;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Focus Mode Mobile */
+@media (max-width: 768px) {
+    .focus-time {
+        font-size: 4rem;
+    }
+
+    .focus-controls {
+        flex-direction: column;
+    }
+
+    .focus-btn-control {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ==================== PHASE 5: GOALS SYSTEM ==================== */
+
+.goals-container {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    border-radius: 16px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+}
+
+.goals-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.goals-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.goals-config-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.goals-config-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
+}
+
+.goals-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.goal-item {
+    background: var(--bg-secondary);
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid var(--bg-tertiary);
+    transition: all 0.3s ease;
+}
+
+.goal-item:hover {
+    transform: translateX(5px);
+    border-color: var(--wetalk);
+}
+
+.goal-item.completed {
+    border-color: #00d4aa;
+    box-shadow: 0 0 20px rgba(0, 212, 170, 0.3);
+}
+
+.goal-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.goal-icon {
+    font-size: 1.5rem;
+}
+
+.goal-details {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.goal-name {
+    font-weight: 600;
+}
+
+.goal-progress-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.goal-bar {
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.goal-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.goal-fill.datacamp-fill {
+    background: linear-gradient(90deg, var(--datacamp), #0056b3);
+}
+
+.goal-fill.platzi-fill {
+    background: linear-gradient(90deg, var(--platzi), #7cb305);
+}
+
+.goal-fill.exercise-fill {
+    background: linear-gradient(90deg, var(--exercise), #ee5a24);
+}
+
+/* Goals Modal */
+.goals-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.goals-modal.active {
+    display: flex;
+}
+
+/* Goal Celebration */
+.goal-celebration {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    animation: celebration-fade 0.3s ease;
+}
+
+.goal-celebration.active {
+    display: flex;
+}
+
+@keyframes celebration-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.celebration-content {
+    text-align: center;
+    animation: celebration-pop 0.5s ease;
+}
+
+@keyframes celebration-pop {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.celebration-icon {
+    font-size: 6rem;
+    display: block;
+    animation: celebration-bounce 1s infinite;
+}
+
+@keyframes celebration-bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.celebration-content h3 {
+    font-size: 2rem;
+    color: #00d4aa;
+    margin: 1rem 0 0.5rem;
+}
+
+.celebration-content p {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+/* Mobile Goals */
+@media (max-width: 768px) {
+    .goal-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.25rem;
+    }
+}
+
+/* ==================== PHASE 5: NOTES SYSTEM ==================== */
+
+.notes-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.notes-modal.active {
+    display: flex;
+}
+
+.note-activity-info {
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+#noteTextarea {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.9rem;
+    resize: vertical;
+    min-height: 80px;
+}
+
+#noteTextarea:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* Note indicator on activity cells */
+.activity-cell .note-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 0.7rem;
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.activity-cell:hover .note-btn {
+    opacity: 1;
+}
+
+.activity-cell .note-btn.has-note {
+    opacity: 1;
+    background: rgba(102, 126, 234, 0.8);
+}
+
+.activity-cell .note-btn:hover {
+    transform: scale(1.1);
+    background: rgba(102, 126, 234, 1);
+}
+
+/* Position relative for activity cells */
+.activity-cell {
+    position: relative;
+}
+
+/* ==================== PHASE 5: CALENDAR SYSTEM ==================== */
+
+.calendar-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    border: 1px solid var(--bg-tertiary);
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.calendar-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    min-width: 150px;
+    text-align: center;
+}
+
+.month-nav {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.month-nav:hover {
+    background: #667eea;
+    transform: scale(1.1);
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.calendar-weekdays span {
+    text-align: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 0.5rem;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    min-height: 50px;
+}
+
+.calendar-day:hover {
+    transform: scale(1.05);
+    background: rgba(102, 126, 234, 0.3);
+}
+
+.calendar-day.empty {
+    background: transparent;
+    cursor: default;
+}
+
+.calendar-day.empty:hover {
+    transform: none;
+}
+
+.calendar-day.today {
+    border: 2px solid #00d4aa;
+    box-shadow: 0 0 10px rgba(0, 212, 170, 0.3);
+}
+
+.calendar-day .day-number {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.calendar-day .day-tasks {
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+}
+
+.calendar-day.has-tasks-low {
+    background: linear-gradient(135deg, rgba(58, 134, 255, 0.2), rgba(58, 134, 255, 0.1));
+}
+
+.calendar-day.has-tasks-medium {
+    background: linear-gradient(135deg, rgba(152, 220, 20, 0.3), rgba(152, 220, 20, 0.1));
+}
+
+.calendar-day.has-tasks-high {
+    background: linear-gradient(135deg, rgba(0, 212, 170, 0.4), rgba(0, 212, 170, 0.2));
+}
+
+.calendar-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+}
+
+.legend-dot.low {
+    background: rgba(58, 134, 255, 0.5);
+}
+
+.legend-dot.medium {
+    background: rgba(152, 220, 20, 0.5);
+}
+
+.legend-dot.high {
+    background: rgba(0, 212, 170, 0.5);
+}
+
+/* Day Detail Modal */
+.day-detail-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.day-detail-modal.active {
+    display: flex;
+}
+
+.day-detail-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.day-detail-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+}
+
+.day-detail-item.completed {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+.day-detail-item .task-icon {
+    font-size: 1.2rem;
+}
+
+.day-detail-item .task-info {
+    flex: 1;
+}
+
+.day-detail-item .task-name {
+    font-weight: 500;
+}
+
+.day-detail-item .task-time {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Mobile Calendar */
+@media (max-width: 768px) {
+    .calendar-day {
+        min-height: 40px;
+    }
+
+    .calendar-day .day-number {
+        font-size: 0.75rem;
+    }
+
+    .calendar-day .day-tasks {
+        display: none;
+    }
+
+    .calendar-legend {
+        flex-wrap: wrap;
+    }
+}
+
+/* ==================== PHASE 6: CLOUD SYNC ==================== */
+
+.cloud-btn {
+    background: linear-gradient(135deg, #00b4d8, #0077b6) !important;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(0, 212, 170, 0.2);
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.user-email {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sync-status {
+    color: #00d4aa;
+    font-weight: bold;
+}
+
+.sync-status.syncing {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Auth Modal */
+.auth-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.auth-modal.active {
+    display: flex;
+}
+
+.auth-content {
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+}
+
+.auth-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.auth-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.auth-tab {
+    flex: 1;
+    padding: 0.75rem;
+    border: none;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.auth-tab.active {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+}
+
+.auth-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--bg-tertiary);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1rem;
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.auth-error {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+    min-height: 20px;
+}
+
+.auth-submit {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1rem;
+}
+
+/* Logged In View */
+.logged-in-view {
+    text-align: center;
+}
+
+.user-profile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.profile-icon {
+    font-size: 2.5rem;
+    background: var(--bg-tertiary);
+    padding: 0.75rem;
+    border-radius: 50%;
+}
+
+.profile-email {
+    font-weight: 500;
+    font-size: 1.1rem;
+}
+
+.sync-info {
+    background: rgba(0, 212, 170, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.sync-info p {
+    margin: 0.5rem 0;
+}
+
+.last-sync {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.auth-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.auth-actions button {
+    flex: 1;
+    padding: 0.75rem;
+}
+
+.logout-btn {
+    background: rgba(255, 107, 107, 0.2) !important;
+    border: 1px solid rgba(255, 107, 107, 0.5) !important;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 107, 107, 0.4) !important;
+}
+
+/* Mobile Auth */
+@media (max-width: 768px) {
+    .user-info {
+        display: none;
+    }
+
+    .auth-actions {
+        flex-direction: column;
     }
 }
