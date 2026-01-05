@@ -1310,4 +1310,332 @@ generateSchedule = function () {
 // Initialize editor on page load
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(initEditor, 600);
+    setTimeout(initAdvancedStats, 700);
 });
+
+// ==================== ADVANCED STATISTICS ====================
+
+const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+let currentHistoryMonth = new Date();
+
+function initAdvancedStats() {
+    generateHeatmap();
+    updateWeekComparison();
+    setupStatsButtons();
+}
+
+// ========== GITHUB-STYLE HEATMAP ==========
+
+function generateHeatmap() {
+    const grid = document.getElementById('heatmapGrid');
+    const monthsContainer = document.getElementById('heatmapMonths');
+    if (!grid) return;
+
+    const completed = loadCompleted();
+    const today = new Date();
+    const cells = [];
+    const monthLabels = new Map();
+
+    // Generate last 90 days
+    for (let i = 89; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateKey = date.toISOString().split('T')[0];
+
+        // Count completed tasks for this day
+        const dayCompleted = completed[dateKey] || {};
+        const count = Object.values(dayCompleted).filter(v => v === true).length;
+
+        // Determine level (0-4)
+        let level = 0;
+        if (count >= 1) level = 1;
+        if (count >= 3) level = 2;
+        if (count >= 6) level = 3;
+        if (count >= 10) level = 4;
+
+        // Track month changes for labels
+        const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
+        if (!monthLabels.has(monthKey)) {
+            monthLabels.set(monthKey, {
+                name: MONTHS_ES[date.getMonth()].substring(0, 3),
+                position: 89 - i
+            });
+        }
+
+        cells.push({
+            date: dateKey,
+            count: count,
+            level: level,
+            dayName: date.toLocaleDateString('es', { weekday: 'short' })
+        });
+    }
+
+    // Render heatmap grid
+    grid.innerHTML = cells.map(cell => `
+        <div class="heatmap-cell level-${cell.level}" 
+             title="${cell.date}: ${cell.count} tareas"
+             data-date="${cell.date}">
+        </div>
+    `).join('');
+
+    // Render month labels
+    if (monthsContainer) {
+        const labelsHtml = Array.from(monthLabels.values()).map(m => `
+            <span style="margin-left: ${m.position * 3}px">${m.name}</span>
+        `).join('');
+        monthsContainer.innerHTML = labelsHtml;
+    }
+}
+
+// ========== WEEK COMPARISON ==========
+
+function updateWeekComparison() {
+    const completed = loadCompleted();
+    const today = new Date();
+
+    // This week (Monday to today)
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1));
+
+    // Last week
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(thisWeekStart);
+    lastWeekEnd.setDate(thisWeekStart.getDate() - 1);
+
+    let thisWeekTasks = 0;
+    let thisWeekMinutes = 0;
+    let lastWeekTasks = 0;
+    let lastWeekMinutes = 0;
+
+    // Calculate this week
+    for (let d = new Date(thisWeekStart); d <= today; d.setDate(d.getDate() + 1)) {
+        const dateKey = d.toISOString().split('T')[0];
+        const dayCompleted = completed[dateKey] || {};
+        const dayTasks = Object.values(dayCompleted).filter(v => v).length;
+        thisWeekTasks += dayTasks;
+        thisWeekMinutes += dayTasks * 45; // Approximate
+    }
+
+    // Calculate last week
+    for (let d = new Date(lastWeekStart); d <= lastWeekEnd; d.setDate(d.getDate() + 1)) {
+        const dateKey = d.toISOString().split('T')[0];
+        const dayCompleted = completed[dateKey] || {};
+        const dayTasks = Object.values(dayCompleted).filter(v => v).length;
+        lastWeekTasks += dayTasks;
+        lastWeekMinutes += dayTasks * 45;
+    }
+
+    // Update UI
+    const thisWeekHours = (thisWeekMinutes / 60).toFixed(1);
+    const lastWeekHours = (lastWeekMinutes / 60).toFixed(1);
+
+    document.getElementById('thisWeekHours').textContent = `${thisWeekHours}h`;
+    document.getElementById('thisWeekDetail').textContent = `${thisWeekTasks} tareas completadas`;
+    document.getElementById('lastWeekHours').textContent = `${lastWeekHours}h`;
+    document.getElementById('lastWeekDetail').textContent = `${lastWeekTasks} tareas completadas`;
+
+    // Comparison result
+    const resultEl = document.getElementById('comparisonResult');
+    if (resultEl) {
+        const diff = thisWeekTasks - lastWeekTasks;
+        const diffHours = (thisWeekMinutes - lastWeekMinutes) / 60;
+
+        if (lastWeekTasks === 0 && thisWeekTasks === 0) {
+            resultEl.innerHTML = `<span class="result-icon">📊</span><span class="result-text">Sin datos para comparar</span>`;
+        } else if (diff > 0) {
+            resultEl.innerHTML = `<span class="result-icon">📈</span><span class="result-text positive">¡+${diff} tareas! (+${diffHours.toFixed(1)}h)</span>`;
+            resultEl.className = 'comparison-result positive';
+        } else if (diff < 0) {
+            resultEl.innerHTML = `<span class="result-icon">📉</span><span class="result-text negative">${diff} tareas (${diffHours.toFixed(1)}h)</span>`;
+            resultEl.className = 'comparison-result negative';
+        } else {
+            resultEl.innerHTML = `<span class="result-icon">➡️</span><span class="result-text">Igual que la semana pasada</span>`;
+            resultEl.className = 'comparison-result';
+        }
+    }
+}
+
+// ========== MONTHLY HISTORY ==========
+
+function setupStatsButtons() {
+    const historyBtn = document.getElementById('viewHistoryBtn');
+    const pdfBtn = document.getElementById('exportPdfBtn');
+    const prevMonth = document.getElementById('prevMonth');
+    const nextMonth = document.getElementById('nextMonth');
+
+    if (historyBtn) historyBtn.onclick = toggleMonthlyHistory;
+    if (pdfBtn) pdfBtn.onclick = exportPDF;
+    if (prevMonth) prevMonth.onclick = () => navigateMonth(-1);
+    if (nextMonth) nextMonth.onclick = () => navigateMonth(1);
+}
+
+function toggleMonthlyHistory() {
+    const historyEl = document.getElementById('monthlyHistory');
+    if (historyEl) {
+        const isVisible = historyEl.style.display !== 'none';
+        historyEl.style.display = isVisible ? 'none' : 'block';
+        if (!isVisible) {
+            updateMonthlyStats();
+        }
+    }
+}
+
+function navigateMonth(direction) {
+    currentHistoryMonth.setMonth(currentHistoryMonth.getMonth() + direction);
+    updateMonthlyStats();
+}
+
+function updateMonthlyStats() {
+    const labelEl = document.getElementById('currentMonthLabel');
+    const statsEl = document.getElementById('monthStats');
+
+    if (labelEl) {
+        labelEl.textContent = `${MONTHS_ES[currentHistoryMonth.getMonth()]} ${currentHistoryMonth.getFullYear()}`;
+    }
+
+    if (statsEl) {
+        const completed = loadCompleted();
+        const year = currentHistoryMonth.getFullYear();
+        const month = currentHistoryMonth.getMonth();
+
+        // Get all days in the month
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        let totalTasks = 0;
+        let totalMinutes = 0;
+        let activeDays = 0;
+
+        const dailyData = [];
+
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const dateKey = date.toISOString().split('T')[0];
+            const dayCompleted = completed[dateKey] || {};
+            const count = Object.values(dayCompleted).filter(v => v).length;
+
+            if (count > 0) {
+                activeDays++;
+                totalTasks += count;
+                totalMinutes += count * 45;
+            }
+
+            dailyData.push({ day, count, dateKey });
+        }
+
+        const totalHours = (totalMinutes / 60).toFixed(1);
+
+        statsEl.innerHTML = `
+            <div class="month-summary">
+                <div class="month-stat">
+                    <span class="stat-number">${totalTasks}</span>
+                    <span class="stat-label">Tareas</span>
+                </div>
+                <div class="month-stat">
+                    <span class="stat-number">${totalHours}h</span>
+                    <span class="stat-label">Estudiadas</span>
+                </div>
+                <div class="month-stat">
+                    <span class="stat-number">${activeDays}</span>
+                    <span class="stat-label">Días activos</span>
+                </div>
+            </div>
+            <div class="month-calendar">
+                ${dailyData.map(d => `
+                    <div class="calendar-day ${d.count > 0 ? 'active' : ''}" title="${d.dateKey}: ${d.count} tareas">
+                        <span class="day-number">${d.day}</span>
+                        ${d.count > 0 ? `<span class="day-count">${d.count}</span>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+}
+
+// ========== PDF EXPORT ==========
+
+function exportPDF() {
+    // Create printable report
+    const completed = loadCompleted();
+    const streakData = loadStreakData();
+    const today = new Date();
+
+    // Calculate weekly stats
+    let weekTasks = 0;
+    let weekMinutes = 0;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() + 1);
+
+    for (let d = new Date(weekStart); d <= today; d.setDate(d.getDate() + 1)) {
+        const dateKey = d.toISOString().split('T')[0];
+        const dayCompleted = completed[dateKey] || {};
+        const count = Object.values(dayCompleted).filter(v => v).length;
+        weekTasks += count;
+        weekMinutes += count * 45;
+    }
+
+    const reportHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Reporte - Mi Horario Semanal</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 40px; }
+                h1 { color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; }
+                .stat-box { display: inline-block; padding: 20px; margin: 10px; background: #f5f5f5; border-radius: 10px; text-align: center; }
+                .stat-number { font-size: 2em; font-weight: bold; color: #667eea; display: block; }
+                .section { margin: 30px 0; }
+                table { width: 100%; border-collapse: collapse; }
+                th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+                th { background: #667eea; color: white; }
+            </style>
+        </head>
+        <body>
+            <h1>📊 Reporte de Mi Horario Semanal</h1>
+            <p>Generado: ${today.toLocaleDateString('es')}</p>
+            
+            <div class="section">
+                <h2>📈 Resumen Esta Semana</h2>
+                <div class="stat-box">
+                    <span class="stat-number">${weekTasks}</span>
+                    <span>Tareas Completadas</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">${(weekMinutes / 60).toFixed(1)}h</span>
+                    <span>Tiempo de Estudio</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-number">🔥 ${streakData.streak}</span>
+                    <span>Días de Racha</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>📅 Actividad Reciente</h2>
+                <table>
+                    <tr><th>Fecha</th><th>Tareas Completadas</th></tr>
+                    ${Object.keys(completed).slice(-7).reverse().map(date => `
+                        <tr>
+                            <td>${date}</td>
+                            <td>${Object.values(completed[date]).filter(v => v).length} tareas</td>
+                        </tr>
+                    `).join('')}
+                </table>
+            </div>
+        </body>
+        </html>
+    `;
+
+    // Open print dialog
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(reportHTML);
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+        printWindow.print();
+    }, 500);
+
+    showReminderPopup('📄', '¡Reporte Generado!', 'Usa Ctrl+P para guardar como PDF.');
+}
