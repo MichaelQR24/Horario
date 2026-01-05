@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Organiza tu semana con bloques de 45 minutos, temporizador Pomodoro y gamificación">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Mi Horario Semanal</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-top">
+                <div class="data-controls">
+                    <button class="control-btn edit-mode-btn" id="editModeBtn" title="Modo Edición">✏️ Editar</button>
+                    <button class="control-btn" id="exportBtn" title="Exportar datos">📥 Exportar</button>
+                    <button class="control-btn" id="importBtn" title="Importar datos">📤 Importar</button>
+                    <input type="file" id="importFile" accept=".json" style="display:none">
+                </div>
+                <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+            <h1>📅 Mi Horario Semanal</h1>
+            <p class="subtitle">Organiza tu semana de manera efectiva</p>
+            <div class="quick-links">
+                <a href="https://www.datacamp.com" target="_blank" class="quick-link datacamp-link">
+                    <span>📊</span> Ir a DataCamp
+                </a>
+                <a href="https://platzi.com" target="_blank" class="quick-link platzi-link">
+                    <span>🚀</span> Ir a Platzi
+                </a>
+            </div>
+            
+            <!-- Pomodoro Timer -->
+            <div class="pomodoro-widget" id="pomodoroWidget">
+                <div class="pomodoro-display">
+                    <span class="pomodoro-time" id="pomodoroTime">45:00</span>
+                    <span class="pomodoro-label" id="pomodoroLabel">Listo para empezar</span>
+                </div>
+                <div class="pomodoro-controls">
+                    <button class="pomodoro-btn start" id="pomodoroStart" title="Iniciar">▶️</button>
+                    <button class="pomodoro-btn pause" id="pomodoroPause" title="Pausar" disabled>⏸️</button>
+                    <button class="pomodoro-btn reset" id="pomodoroReset" title="Reiniciar">🔄</button>
+                </div>
+                <div class="pomodoro-presets">
+                    <button class="preset-btn active" data-time="45">45 min</button>
+                    <button class="preset-btn" data-time="25">25 min</button>
+                    <button class="preset-btn" data-time="15">15 min</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Reminders Panel -->
+        <div class="reminders-panel" id="remindersPanel">
+            <div class="reminder-item">
+                <span>💧 Recordatorio de hidratación</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="hydrationReminder" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="reminder-item">
+                <span>👁️ Descanso visual (20-20-20)</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="eyeRestReminder" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="reminder-item">
+                <span>🔔 Notificaciones del navegador</span>
+                <button class="notification-btn" id="enableNotifications">Activar</button>
+            </div>
+        </div>
+
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-color hygiene"></span>
+                <span>🚿 Aseo</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color wetalk"></span>
+                <span>🗣️ WeTalk</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color exercise"></span>
+                <span>💪 Ejercicio</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color datacamp"></span>
+                <span>📊 DataCamp</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color platzi"></span>
+                <span>🚀 Platzi</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color breakfast"></span>
+                <span>🍳 Desayuno</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color lunch"></span>
+                <span>🍲 Almuerzo</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color dinner"></span>
+                <span>🌙 Cena</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color break"></span>
+                <span>☕ Descanso</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color free"></span>
+                <span>✨ Libre</span>
+            </div>
+        </div>
+
+        <div class="schedule-container">
+            <div class="schedule-grid" id="scheduleGrid">
+                <!-- Generated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Phase 3: Gamification Panel -->
+        <section class="gamification-panel">
+            <div class="streak-container">
+                <div class="streak-display" id="streakDisplay">
+                    <span class="streak-icon" id="streakIcon">🔥</span>
+                    <div class="streak-info">
+                        <span class="streak-count" id="streakCount">0</span>
+                        <span class="streak-label">días de racha</span>
+                    </div>
+                </div>
+                <p class="streak-message" id="streakMessage">¡Completa tareas hoy para empezar tu racha!</p>
+            </div>
+
+            <div class="weekly-stats">
+                <h3>📈 Estadísticas de Esta Semana</h3>
+                <div class="stats-grid">
+                    <div class="stat-item datacamp-stat">
+                        <div class="stat-header">
+                            <span>📊 DataCamp</span>
+                            <span class="stat-value" id="datacampHours">0h</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill datacamp-fill" id="datacampBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item platzi-stat">
+                        <div class="stat-header">
+                            <span>🚀 Platzi</span>
+                            <span class="stat-value" id="platziHours">0h</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill platzi-fill" id="platziBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item exercise-stat">
+                        <div class="stat-header">
+                            <span>💪 Ejercicio</span>
+                            <span class="stat-value" id="exerciseDays">0/7 días</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill exercise-fill" id="exerciseBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item completion-stat">
+                        <div class="stat-header">
+                            <span>✅ Completado Hoy</span>
+                            <span class="stat-value" id="completionPercent">0%</span>
+                        </div>
+                        <div class="stat-bar">
+                            <div class="stat-fill completion-fill" id="completionBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="achievements-container">
+                <h3>🏆 Logros</h3>
+                <div class="achievements-grid" id="achievementsGrid">
+                    <!-- Generated by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <section class="summary">
+            <h2>📊 Resumen Semanal</h2>
+            <div class="summary-cards">
+                <div class="summary-card wetalk-card">
+                    <div class="card-icon">🗣️</div>
+                    <div class="card-content">
+                        <h3>WeTalk (Inglés)</h3>
+                        <p class="hours">6 horas/semana</p>
+                        <p class="detail">Lun, Mié, Vie: 8:00-10:00 AM (fijo)</p>
+                    </div>
+                </div>
+                <div class="summary-card exercise-card">
+                    <div class="card-icon">💪</div>
+                    <div class="card-content">
+                        <h3>Ejercicio</h3>
+                        <p class="hours">45 min/día</p>
+                        <p class="detail">Todos los días: 5:00 PM</p>
+                    </div>
+                </div>
+                <div class="summary-card datacamp-card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-content">
+                        <h3>DataCamp</h3>
+                        <p class="hours">~12 horas/semana</p>
+                        <p class="detail">Bloques de 45 min + descansos</p>
+                    </div>
+                </div>
+                <div class="summary-card platzi-card">
+                    <div class="card-icon">🚀</div>
+                    <div class="card-content">
+                        <h3>Platzi</h3>
+                        <p class="hours">~12 horas/semana</p>
+                        <p class="detail">Bloques de 45 min + descansos</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="tips">
+            <h2>💡 Tips de Productividad</h2>
+            <div class="tips-grid">
+                <div class="tip">
+                    <span class="tip-icon">🌅</span>
+                    <p>Comienza el día con ejercicio para activar tu energía</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">🎯</span>
+                    <p>Alterna entre DataCamp y Platzi para mantener el interés</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">⏰</span>
+                    <p>Toma descansos de 5-10 min cada hora de estudio</p>
+                </div>
+                <div class="tip">
+                    <span class="tip-icon">💤</span>
+                    <p>Termina actividades a las 11 PM para descansar apropiadamente</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="edit-modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Editar Actividad</h3>
+                <button class="modal-close" id="modalClose">✕</button>
+            </div>
+            <form id="editForm">
+                <div class="form-group">
+                    <label>Actividad</label>
+                    <select id="activitySelect" required>
+                        <option value="WETALK">🗣️ WeTalk</option>
+                        <option value="DATACAMP">📊 DataCamp</option>
+                        <option value="PLATZI">🚀 Platzi</option>
+                        <option value="EXERCISE">💪 Ejercicio</option>
+                        <option value="HYGIENE">🚿 Aseo</option>
+                        <option value="BREAKFAST">🍳 Desayuno</option>
+                        <option value="LUNCH">🍲 Almuerzo</option>
+                        <option value="DINNER">🌙 Cena</option>
+                        <option value="BREAK">☕ Descanso</option>
+                        <option value="FREE">✨ Libre</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Hora Inicio</label>
+                        <input type="time" id="startTime" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Duración (min)</label>
+                        <input type="number" id="duration" min="15" max="180" step="15" value="45" required>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-delete" id="deleteBtn">🗑️ Eliminar</button>
+                    <button type="submit" class="btn-save">💾 Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Activity Button (floating) -->
+    <button class="fab-add" id="fabAdd" style="display:none" title="Agregar actividad">➕</button>
+
+    <script src="script.js"></script>
+</body>
+</html>
